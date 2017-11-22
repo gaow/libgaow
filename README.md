@@ -1,2 +1,2 @@
 # libgaow
-Routine computational tasks developed by @gaow
+Routine computational performed by @gaow
