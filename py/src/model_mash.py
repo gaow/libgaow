@@ -6,7 +6,7 @@ __license__ = "MIT"
 __version__ = "0.1.0"
 
 import numpy as np, scipy as sp
-from scipy.stats import norm
+from scipy.stats import norm, multivariate_normal as mvnorm
 
 def inv_sympd(m):
     '''
@@ -23,6 +23,37 @@ def get_svs(s, V):
     diag(s) @ V @ diag(s)
     '''
     return (s * V.T).T * s
+
+class LikelihoodMASH:
+    def __init__(self, data):
+        self.J = data.B.shape[1]
+        self.R = data.B.shape[0]
+        self.P = len(data.U)
+        self.data = data
+        self.data.lik = np.matlib.zeros(self.J, self.P)
+        self.data.loglik = np.matlib.zeros(self.J, self.P)
+
+    def compute_likelihood(self):
+        mean_vec = np.zeros(self.R)
+        for j in range(self.J):
+            sigma_mat = get_svs(self.data.S[:,j], self.data.V)
+            for p in range(self.P):
+                self.data.loglik[j,p] = mvnorm.logpdf(self.data.B[:,j], mean_vec, sigma_mat + self.data.U[p])
+        self.data.lik = np.exp(self.data.loglik)
+
+    def compute_likelihood_comcov(self):
+        mean_vec = np.zeros(self.R)
+        sigma_mat = get_svs(self.data.S[:,0], self.data.V)
+        for p in range(self.P):
+            self.data.loglik[:,p] = mvnorm.logpdf(self.data.B, mean_vec, sigma_mat + self.data.U[p])
+
+    @classmethod
+    def apply(cls, data):
+        obj = cls(data)
+        if data.is_common_cov():
+            obj.compute_likelihood_comcov()
+        else:
+            obj.compute_likelihood()
 
 class PosteriorMASH:
     def __init__(self, data):
@@ -51,10 +82,10 @@ class PosteriorMASH:
             neg_mat = np.matlib.zeros((self.R, self.P))
             for p in range(self.P):
                 U1_mat = self.get_posterior_cov(Vinv_mat, self.data.U[p])
-                mu1_mat[:,p] = self.get_posterior_mean(self.B[:,p], Vinv_mat, U1_mat)
+                mu1_mat[:,p] = self.get_posterior_mean(self.B[:,j], Vinv_mat, U1_mat)
                 sigma_vec = np.sqrt(np.diag(U1_mat))
                 mu2_mat[:,p] = np.square(mu1_mat[:,p]) + np.diag(U1_mat)
-                neg_mat[:,p] = norm.pdf(mu1_mat[:,p], mean_vec, sigma_vec)
+                neg_mat[:,p] = norm.cdf(mu1_mat[:,p], mean_vec, sigma_vec)
                 zero_mat[sigma_vec == 0,p] = 1.0
                 neg_mat[sigma_vec == 0,p] = 0.0
             self.data.post_mean_mat[:,j] = mu1_mat * self.data.posterior_weights[:,j]
@@ -72,7 +103,7 @@ class PosteriorMASH:
             sigma_vec = np.sqrt(np.diag(U1_mat))
             sigma_mat = np.repeat(sigma_vec, self.J, axis = 1)
             m2_mat = np.square(mu1_mat) + np.diag(U1_mat)
-            neg_mat = np.norm(mu1_mat, mean_mat, sigma_mat)
+            neg_mat = norm.cdf(mu1_mat, mean_mat, sigma_mat)
             zero_mat[sigma_vec == 0,:] = 1.0
             neg_mat[sigma_vec == 0,:] = 0.0
             self.data.post_mean_mat += posterior_weights[p,:] * mu1_mat
