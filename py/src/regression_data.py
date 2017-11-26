@@ -5,21 +5,17 @@ __email__ = "gaow@uchicago.edu"
 __license__ = "MIT"
 __version__ = "0.1.0"
 
-from regression_lik import *
-from regression_prior import *
-from regression_post import *
+from model_mash import PosteriorMash
 
 class RegressionData:
-    def __init__(self, X = None, Y = None, Z = None):
+    def __init__(self, X = None, Y = None, Z = None, B = None, S = None):
         self.X = X
         self.Y = Y
         self.Z = Z
-        self.B = None
-        self.S = None
-        self.prior = None
+        self.B = B
+        self.S = S
         self.loglik = None
         self.BF = None
-        self.posterior = None
 
     def set_prior(self):
         pass
@@ -27,9 +23,27 @@ class RegressionData:
     def calc_loglik(self):
         pass
 
+    def calc_posterior(self):
+        pass
+
     def calc_bf(self):
         pass
 
 class MashData(RegressionData):
-    def __init__(self, X = None, Y = None, Z = None):
-        RegressionData.__init__(self, X, Y, Z)
+    def __init__(self, X = None, Y = None, Z = None, B = None, S = None):
+        RegressionData.__init__(self, X, Y, Z, B, S)
+        self.post_mean_mat = None
+        self.post_mean2_mat = None
+        self.neg_prob_mat = None
+        self.zero_prob_mat = None
+        self._is_common_cov = None
+        self.V = None
+        self.U = None
+
+    def is_common_cov(self):
+        if self._is_common_cov is None and self.S is not None:
+            self._is_common_cov = (self.S == self.S[:,0]).all()
+        return self._is_common_cov
+
+    def calc_posterior(self):
+        PosteriorMash.apply(self)
