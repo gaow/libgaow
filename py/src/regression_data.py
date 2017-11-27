@@ -5,7 +5,7 @@ __email__ = "gaow@uchicago.edu"
 __license__ = "MIT"
 __version__ = "0.1.0"
 
-from model_mash import LikelihoodMASH, PosteriorMASH
+from model_mash import PriorMASH, LikelihoodMASH, PosteriorMASH
 
 class RegressionData:
     def __init__(self, X = None, Y = None, Z = None, B = None, S = None):
@@ -29,7 +29,7 @@ class RegressionData:
     def calc_bf(self):
         pass
 
-class MashData(RegressionData):
+class MASHData(RegressionData):
     def __init__(self, X = None, Y = None, Z = None, B = None, S = None):
         RegressionData.__init__(self, X, Y, Z, B, S)
         self.post_mean_mat = None
@@ -45,7 +45,7 @@ class MashData(RegressionData):
 
     def is_common_cov(self):
         if self._is_common_cov is None and self.S is not None:
-            self._is_common_cov = (self.S == self.S[:,0]).all()
+            self._is_common_cov = (self.S.T == self.S.T[0,:]).all()
         return self._is_common_cov
 
     def calc_posterior(self):
