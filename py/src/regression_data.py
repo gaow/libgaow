@@ -14,9 +14,8 @@ class RegressionData:
         self.Z = Z
         self.B = B
         self.S = S
-        self.loglik = None
         self.lik = None
-        self.BF = None
+        self.l10bf = None
 
     def set_prior(self):
         pass
@@ -40,6 +39,9 @@ class MashData(RegressionData):
         self._is_common_cov = None
         self.V = None
         self.U = None
+        self.pi = None
+        self.posterior_weights = None
+        self.grid = None
 
     def is_common_cov(self):
         if self._is_common_cov is None and self.S is not None:
