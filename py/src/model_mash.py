@@ -25,8 +25,14 @@ def get_svs(s, V):
     '''
     return (s * V.T).T * s
 
-def is_invertible(a):
-    return a.shape[0] == a.shape[1] and np.linalg.matrix_rank(a) == a.shape[0]
+def safe_mvnorm_logpdf(val, cov):
+    try:
+        return mvnorm.logpdf(val, cov=cov)
+    except np.linalg.linalg.LinAlgError:
+        if len(val.shape) == 1:
+            return np.inf if np.sum(val) < 1E-6 else -np.inf
+        else:
+            return np.array([np.inf if np.sum(x) < 1E-6 else -np.inf for x in val.T])
 
 class LikelihoodMASH:
     def __init__(self, data):
@@ -56,16 +62,12 @@ class LikelihoodMASH:
         loglik = np.zeros((self.J, self.P))
         for j in range(self.J):
             sigma_mat = get_svs(self.data.S[j,:], self.data.V)
-            try:
-                loglik[j,:] = np.array([mvnorm.logpdf(self.data.B[j,:], cov = sigma_mat + self.data.U[p], allow_singular = True) for p in self.data.U])
-            except Exception:
-                self.debug = {'j': j, 'covs': [sigma_mat + self.data.U[p] for p in self.data.U]}
-                raise
+            loglik[j,:] = np.array([safe_mvnorm_logpdf(self.data.B[j,:], sigma_mat + self.data.U[p]) for p in self.data.U])
         return loglik
 
     def _calc_likelihood_matrix_comcov(self):
         sigma_mat = get_svs(self.data.S[0,:], self.data.V)
-        return np.array([mvnorm.logpdf(self.data.B, cov = sigma_mat + self.data.U[p]) for p in self.data.U])
+        return np.array([safe_mvnorm_logpdf(self.data.B, sigma_mat + self.data.U[p]) for p in self.data.U])
 
     def compute_loglik_from_matrix(self, options = ['all', 'alt', 'null']):
         '''

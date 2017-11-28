@@ -5,7 +5,9 @@ __email__ = "gaow@uchicago.edu"
 __license__ = "MIT"
 __version__ = "0.1.0"
 
-from model_mash import PriorMASH, LikelihoodMASH, PosteriorMASH
+from .model_mash import PriorMASH, LikelihoodMASH, PosteriorMASH
+from scipy.stats import linregress
+from sklearn.linear_model import LinearRegression
 
 class RegressionData:
     def __init__(self, X = None, Y = None, Z = None, B = None, S = None):
@@ -16,7 +18,21 @@ class RegressionData:
         self.S = S
         self.lik = None
         self.l10bf = None
+        if (self.X is not None and self.Y is not None) and (self.B is None and self.S is None):
+            self.get_summary_stats()
 
+    def get_summary_stats(self):
+        '''
+        perform univariate regression
+        FIXME: it is slower than lapply + .lm.fit in R
+        FIXME: this faster implementation is on my watch list:
+        https://github.com/ajferraro/fastreg
+        '''
+        self.B = np.zeros((self.X.shape[1], self.Y.shape[1]))
+        self.S = np.zeros((self.X.shape[1], self.Y.shape[1]))
+        for r, y in enumerate(self.Y.T):
+            self.B[:,r], self.S[:,r] = univariate_simple_regression(self.X, y)[:,[0,2]].T
+ 
     def set_prior(self):
         pass
 
@@ -28,6 +44,15 @@ class RegressionData:
 
     def calc_bf(self):
         pass
+
+    @staticmethod
+    def univariate_simple_regression(X, y, Z=None):
+        if Z is not None:
+            model = LinearRegression()
+            model.fit(Z, y)
+            y = y - model.predict(Z)
+        return np.vstack([linregress(x, y) for x in X.T])[:,[0,1,4]]
+
 
 class MASHData(RegressionData):
     def __init__(self, X = None, Y = None, Z = None, B = None, S = None):
