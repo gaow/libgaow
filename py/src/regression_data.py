@@ -5,7 +5,7 @@ __email__ = "gaow@uchicago.edu"
 __license__ = "MIT"
 __version__ = "0.1.0"
 
-from .model_mash import PriorMASH, LikelihoodMASH, PosteriorMASH
+#from .model_mash import PriorMASH, LikelihoodMASH, PosteriorMASH
 from scipy.stats import linregress
 from sklearn.linear_model import LinearRegression
 
@@ -17,7 +17,6 @@ class RegressionData:
         self.B = B
         self.S = S
         self.lik = None
-        self.l10bf = None
         if (self.X is not None and self.Y is not None) and (self.B is None and self.S is None):
             self.get_summary_stats()
 
@@ -31,20 +30,8 @@ class RegressionData:
         self.B = np.zeros((self.X.shape[1], self.Y.shape[1]))
         self.S = np.zeros((self.X.shape[1], self.Y.shape[1]))
         for r, y in enumerate(self.Y.T):
-            self.B[:,r], self.S[:,r] = univariate_simple_regression(self.X, y)[:,[0,2]].T
- 
-    def set_prior(self):
-        pass
-
-    def calc_likelihood(self):
-        pass
-
-    def calc_posterior(self):
-        pass
-
-    def calc_bf(self):
-        pass
-
+            self.B[:,r], self.S[:,r] = self.univariate_simple_regression(self.X, y)[:,[0,2]].T
+        
     @staticmethod
     def univariate_simple_regression(X, y, Z=None):
         if Z is not None:
@@ -53,6 +40,11 @@ class RegressionData:
             y = y - model.predict(Z)
         return np.vstack([linregress(x, y) for x in X.T])[:,[0,1,4]]
 
+    def __str__(self):
+        l = dir(self)
+        d = self.__dict__
+        from pprint import pformat
+        return pformat(d, indent = 4)
 
 class MASHData(RegressionData):
     def __init__(self, X = None, Y = None, Z = None, B = None, S = None):
@@ -67,14 +59,16 @@ class MASHData(RegressionData):
         self.pi = None
         self.posterior_weights = None
         self.grid = None
+        self.l10bf = None
 
     def is_common_cov(self):
         if self._is_common_cov is None and self.S is not None:
             self._is_common_cov = (self.S.T == self.S.T[0,:]).all()
         return self._is_common_cov
 
-    def calc_posterior(self):
+    def compute_posterior(self):
         PosteriorMASH.apply(self)
 
-    def calc_likelihood(self):
-        LikelihoodMASH.apply(self)
+    def set_prior(self):
+        prior = PriorMASH(self)
+        prior.expand_cov()

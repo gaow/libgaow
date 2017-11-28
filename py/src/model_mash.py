@@ -49,7 +49,7 @@ class LikelihoodMASH:
         self.debug = None
 
     def compute_log10bf(self):
-        self.data.log10bf = (self.data.lik['alt_loglik'] -  self.data.lik['null_loglik']) / np.log(10)
+        self.data.l10bf = (self.data.lik['alt_loglik'] -  self.data.lik['null_loglik']) / np.log(10)
 
     def compute_relative_likelihood_matrix(self):
         matrix_llik = self._calc_likelihood_matrix_comcov() if self.data.is_common_cov() \
