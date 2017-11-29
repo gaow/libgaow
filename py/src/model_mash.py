@@ -67,7 +67,7 @@ class LikelihoodMASH:
 
     def _calc_likelihood_matrix_comcov(self):
         sigma_mat = get_svs(self.data.S[0,:], self.data.V)
-        return np.array([safe_mvnorm_logpdf(self.data.B, sigma_mat + self.data.U[p]) for p in self.data.U])
+        return np.array([safe_mvnorm_logpdf(self.data.B, sigma_mat + self.data.U[p]) for p in self.data.U]).T
 
     def compute_loglik_from_matrix(self, options = ['marginal', 'alt', 'null']):
         '''
@@ -126,21 +126,21 @@ class PosteriorMASH:
     def compute_posterior_comcov(self):
         Vinv_mat = inv_sympd(get_svs(self.data.S[0,:], self.data.V))
         for p, name in enumerate(self.data.U.keys()):
-            zero_mat = np.zeros((self.R, self.P))
+            zero_mat = np.zeros((self.R, self.J))
             U1_mat = self.get_posterior_cov(Vinv_mat, self.data.U[name])
             mu1_mat = self.get_posterior_mean_mat(self.data.B, Vinv_mat, U1_mat)
             sigma_vec = np.sqrt(np.diag(U1_mat))
             null_cond = (sigma_vec == 0)
-            sigma_mat = np.repeat(sigma_vec, self.J, axis = 1)
+            sigma_mat = np.tile(sigma_vec, (self.J, 1)).T
             neg_mat = np.zeros((self.R, self.J))
             if not null_cond.all():
                 neg_mat[np.invert(null_cond),:] = norm.sf(mu1_mat[np.invert(null_cond),:], scale = sigma_mat[np.invert(null_cond),:])
-            m2_mat = np.square(mu1_mat) + np.diag(U1_mat)
+            mu2_mat = np.square(mu1_mat) + np.vstack(np.diag(U1_mat))
             zero_mat[null_cond,:] = 1.0
-            self.data.post_mean_mat += posterior_weights[p,:] * mu1_mat
-            self.data.post_mean2_mat += posterior_weights[p,:] * mu2_mat
-            self.data.neg_prob_mat += posterior_weights[p,:] * neg_mat
-            self.data.zero_prob_mat += posterior_weights[p,:] * zero_mat
+            self.data.post_mean_mat += self.data.posterior_weights[p,:] * mu1_mat
+            self.data.post_mean2_mat += self.data.posterior_weights[p,:] * mu2_mat
+            self.data.neg_prob_mat += self.data.posterior_weights[p,:] * neg_mat
+            self.data.zero_prob_mat += self.data.posterior_weights[p,:] * zero_mat
 
     @staticmethod
     def get_posterior_mean_vec(B, V_inv, U):
@@ -148,7 +148,7 @@ class PosteriorMASH:
 
     @staticmethod
     def get_posterior_mean_mat(B, V_inv, U):
-        return B @ V_inv @ U
+        return (B @ V_inv @ U).T
 
     @staticmethod
     def get_posterior_cov(V_inv, U):
