@@ -54,8 +54,8 @@ class LikelihoodMASH:
     def compute_relative_likelihood_matrix(self):
         matrix_llik = self._calc_likelihood_matrix_comcov() if self.data.is_common_cov() \
                       else self._calc_likelihood_matrix()
-        lfactors = np.vstack(np.amax(matrix_llik, axis = 1))
-        self.data.lik['relative_likelihood'] = np.exp(matrix_llik - lfactors)
+        lfactors = np.amax(matrix_llik, axis = 1)
+        self.data.lik['relative_likelihood'] = np.exp(matrix_llik - np.vstack(lfactors))
         self.data.lik['lfactor'] = lfactors
 
     def _calc_likelihood_matrix(self):
@@ -69,17 +69,17 @@ class LikelihoodMASH:
         sigma_mat = get_svs(self.data.S[0,:], self.data.V)
         return np.array([safe_mvnorm_logpdf(self.data.B, sigma_mat + self.data.U[p]) for p in self.data.U])
 
-    def compute_loglik_from_matrix(self, options = ['all', 'alt', 'null']):
+    def compute_loglik_from_matrix(self, options = ['marginal', 'alt', 'null']):
         '''
         data.lik.relative_likelihood first column is null, the rest are alt
         '''
         if 'marginal' in options:
-            self.data.lik['marginal_loglik'] = np.log(self.data.lik['relative_likelihood'] @ self.data.pi) + self.data.lik['lfactor'] - np.sum(np.log(self.data.S), axis = 0)
+            self.data.lik['marginal_loglik'] = np.log(self.data.lik['relative_likelihood'] @ self.data.pi) + self.data.lik['lfactor']
             self.data.lik['loglik'] = np.sum(self.data.lik['marginal_loglik'])
         if 'alt' in options:
-            self.data.lik['alt_loglik'] = np.log(self.data.lik['relative_likelihood'][:,1:] @ (self.data.pi[1:] / (1 - self.data.pi[0]))) + self.data.lik['lfactor'] - np.sum(np.log(self.data.S), axis = 1)
+            self.data.lik['alt_loglik'] = np.log(self.data.lik['relative_likelihood'][:,1:] @ (self.data.pi[1:] / (1 - self.data.pi[0]))) + self.data.lik['lfactor']
         if 'null' in options:
-            self.data.lik['null_loglik'] = np.log(self.data.lik['relative_likelihood'][:,0]) + self.data.lik['lfactor'] - np.sum(np.log(self.data.S), axis = 1)
+            self.data.lik['null_loglik'] = np.log(self.data.lik['relative_likelihood'][:,0]) + self.data.lik['lfactor']
 
 class PosteriorMASH:
     def __init__(self, data):
@@ -116,7 +116,7 @@ class PosteriorMASH:
                 null_cond = (sigma_vec == 0)
                 mu2_mat[:,p] = np.square(mu1_mat[:,p]) + np.diag(U1_mat)
                 if not null_cond.all():
-                    neg_mat[np.invert(null_cond),p] = norm.cdf(mu1_mat[np.invert(null_cond),p], scale=sigma_vec[np.invert(null_cond)])
+                    neg_mat[np.invert(null_cond),p] = norm.sf(mu1_mat[np.invert(null_cond),p], scale=sigma_vec[np.invert(null_cond)])
                 zero_mat[null_cond,p] = 1.0
             self.data.post_mean_mat[:,j] = mu1_mat @ self.data.posterior_weights[:,j]
             self.data.post_mean2_mat[:,j] = mu2_mat @ self.data.posterior_weights[:,j]
@@ -134,7 +134,7 @@ class PosteriorMASH:
             sigma_mat = np.repeat(sigma_vec, self.J, axis = 1)
             neg_mat = np.zeros((self.R, self.J))
             if not null_cond.all():
-                neg_mat[np.invert(null_cond),:] = norm.cdf(mu1_mat[np.invert(null_cond),:], scale = sigma_mat[np.invert(null_cond),:])
+                neg_mat[np.invert(null_cond),:] = norm.sf(mu1_mat[np.invert(null_cond),:], scale = sigma_mat[np.invert(null_cond),:])
             m2_mat = np.square(mu1_mat) + np.diag(U1_mat)
             zero_mat[null_cond,:] = 1.0
             self.data.post_mean_mat += posterior_weights[p,:] * mu1_mat
