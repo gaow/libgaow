@@ -5,18 +5,27 @@ __email__ = "gaow@uchicago.edu"
 __license__ = "MIT"
 __version__ = "0.1.0"
 
-#from .model_mash import PriorMASH, LikelihoodMASH, PosteriorMASH
+from .model_mash import PriorMASH, LikelihoodMASH, PosteriorMASH
 from scipy.stats import linregress
 from sklearn.linear_model import LinearRegression
+import numpy as np
+import copy
 
-class RegressionData:
+class dotdict(dict):
+    """dot.notation access to dictionary attributes"""
+    __setattr__ = dict.__setitem__
+    __getattr__ = dict.__getitem__
+    __delattr__ = dict.__delitem__
+
+    def __deepcopy__(self, memo):
+        return dotdict(copy.deepcopy(dict(self)))
+
+class RegressionData(dotdict):
     def __init__(self, X = None, Y = None, Z = None, B = None, S = None):
-        self.X = X
-        self.Y = Y
-        self.Z = Z
-        self.B = B
-        self.S = S
-        self.lik = None
+        # FIXME: check if inputs are indeed numpy arrays
+        self.reset({'X': X, 'Y': Y, 'Z': Z, 'B': B, 'S': S, 'lik' : None})
+        if X is not None:
+            self.trace_XXt = np.sum(np.square(X), axis = 1)
         if (self.X is not None and self.Y is not None) and (self.B is None and self.S is None):
             self.get_summary_stats()
 
@@ -34,6 +43,9 @@ class RegressionData:
         self.S = np.zeros((self.X.shape[1], self.Y.shape[1]))
         for r, y in enumerate(self.Y.T):
             self.B[:,r], self.S[:,r] = self.univariate_simple_regression(self.X, y)[:,[0,2]].T
+
+    def reset(self, init_data):
+        self.update(init_data)
 
     @staticmethod
     def univariate_simple_regression(X, y, Z=None):
@@ -84,6 +96,6 @@ class MASH(RegressionData):
         # FIXME: allow autogrid select?
         self.U = U
         self.grid = grid
-        self.pi = pi
+        self.pi = np.array(pi) if pi is not None else None
         prior = PriorMASH(self)
         prior.expand_cov()
