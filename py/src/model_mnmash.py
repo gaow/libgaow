@@ -6,7 +6,6 @@ __license__ = "MIT"
 __version__ = "0.1.0"
 
 import numpy as np, scipy as sp
-from collections import OrderedDict
 from scipy.stats import norm, multivariate_normal as mvnorm
 
 class ELBOMNM:

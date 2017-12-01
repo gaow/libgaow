@@ -7,7 +7,6 @@ __version__ = "0.1.0"
 
 import numpy as np, scipy as sp
 from scipy.stats import norm, multivariate_normal as mvnorm
-from collections import OrderedDict
 
 def inv_sympd(m):
     '''
@@ -172,8 +171,9 @@ class PriorMASH:
         def product(x,y):
             for item in y:
                 yield x*item
-        res = OrderedDict()
+        # dict in Python 3.6 is ordered
+        res = dict()
         if use_pointmass:
             res['null'] = np.zeros((self.R, self.R))
-        res.update(OrderedDict(sum([[(f"{p}.{i+1}", g) for i, g in enumerate(product(self.data.U[p], np.square(self.data.grid)))] for p in self.data.U], [])))
+        res.update(dict(sum([[(f"{p}.{i+1}", g) for i, g in enumerate(product(self.data.U[p], np.square(self.data.grid)))] for p in self.data.U], [])))
         self.data.U = res

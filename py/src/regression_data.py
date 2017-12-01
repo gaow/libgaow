@@ -92,13 +92,15 @@ class MASH(RegressionData):
             self._is_common_cov = (self.S.T == self.S.T[0,:]).all()
         return self._is_common_cov
 
-    def set_prior(self, U, grid, pi = None):
+    def set_prior(self, U, grid = None, pi = None):
         # FIXME: allow autogrid select?
+        # FIXME: ensure U is ordered dict
         self.U = U
         self.grid = grid
         self.pi = np.array(pi) if pi is not None else None
         prior = PriorMASH(self)
-        prior.expand_cov()
+        if grid is not None:
+            prior.expand_cov()
 
 class MNMASH:
     def __init__(self, X=None, Y=None, Z=None, B=None, S=None, V=None):
@@ -112,7 +114,7 @@ class MNMASH:
         self.elbo = []
         self.post_mean_mat = None
 
-    def set_prior(self, U, grid, pi):
+    def set_prior(self, U, grid = None, pi = None):
         self.mash.set_prior(U, grid, pi)
 
     def fit(self, niter=100, L=5, calc_elbo=False):
