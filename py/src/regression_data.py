@@ -148,6 +148,12 @@ class MNMASH:
             almu[l,:,:] = np.vstack(self.alpha0[l,:]) * self.mu0[l,:,:]
         self.post_mean_mat = np.sum(almu, axis = 0)
 
+    def __str__(self):
+        l = dir(self)
+        d = self.__dict__
+        from pprint import pformat
+        return pformat(d, indent = 4)
+
 if __name__ == '__main__':
     model = MNMASH(X=X,Y=Y)
     model.fit(niter = 50)
