@@ -6,8 +6,6 @@ __license__ = "MIT"
 __version__ = "0.1.0"
 
 from .model_mash import PriorMASH, LikelihoodMASH, PosteriorMASH
-from scipy.stats import linregress
-from sklearn.linear_model import LinearRegression
 import numpy as np
 import copy
 
@@ -23,6 +21,7 @@ class dotdict(dict):
 class RegressionData(dotdict):
     def __init__(self, X = None, Y = None, Z = None, B = None, S = None):
         # FIXME: check if inputs are indeed numpy arrays
+        self.x_centered = self.y_centered = self.z_centered = False
         self.reset({'X': X, 'Y': Y, 'Z': Z, 'B': B, 'S': S, 'lik' : None})
         if X is not None:
             self.trace_XXt = np.sum(np.square(X), axis = 1)
@@ -32,28 +31,39 @@ class RegressionData(dotdict):
     def fit(self):
         pass
 
-    def get_summary_stats(self):
-        '''
-        perform univariate regression
-        FIXME: it is slower than lapply + .lm.fit in R
-        FIXME: this faster implementation is on my watch list:
-        https://github.com/ajferraro/fastreg
-        '''
-        self.B = np.zeros((self.X.shape[1], self.Y.shape[1]))
-        self.S = np.zeros((self.X.shape[1], self.Y.shape[1]))
-        for r, y in enumerate(self.Y.T):
-            self.B[:,r], self.S[:,r] = self.univariate_simple_regression(self.X, y)[:,[0,2]].T
+    def get_summary_stats():
+        if self.Z is not None:
+            self.remove_covariates()
+        # Compute betahat
+        XtY = self.X.T @ self.Y
+        XtX_vec = np.einsum('ji,ji->i', self.X, self.X)
+        self.B = XtY / XtX_vec[:,np.newaxis]
+        # Compute se(betahat)
+        Xr = self.Y - np.einsum('ij,jk->jik', self.X, self.B)
+        Re = np.einsum('ijk,ijk->ik', Xr, Xr)
+        self.S = np.sqrt(Re / XtX_vec[:,np.newaxis] / (self.X.shape[0] - 2))
+
+    def remove_covariates(self):
+        self.Y -= self.Z @ (np.linalg.inv(self.Z.T @ self.Z) @ self.Z.T @ self.Y)
+        self.Z = None
 
     def reset(self, init_data):
         self.update(init_data)
-
-    @staticmethod
-    def univariate_simple_regression(X, y, Z=None):
-        if Z is not None:
-            model = LinearRegression()
-            model.fit(Z, y)
-            y = y - model.predict(Z)
-        return np.vstack([linregress(x, y) for x in X.T])[:,[0,1,4]]
+        if 'X' in init_data:
+            self.x_centered = False
+        if 'Y' in init_data:
+            self.y_centered = False
+        if 'Z' in init_data:
+            self.z_centered = False
+        if self.X is not None and not self.x_centered:
+            self.X -= np.mean(self.X, axis=0, keepdims=True)
+            self.x_centered = True
+        if self.Y is not None and not self.y_centered:
+            self.Y -= np.mean(self.Y, axis=0, keepdims=True)
+            self.y_centered = True
+        if self.Z is not None and not self.z_centered:
+            self.Z -= np.mean(self.Z, axis=0, keepdims=True)
+            self.z_centered = True
 
     def __str__(self):
         l = dir(self)
