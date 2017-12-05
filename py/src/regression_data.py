@@ -90,7 +90,7 @@ class MASH(RegressionData):
         if self.pi is None:
             raise RuntimeError('MASH mixture fitting not implemented')
         if self.V is None:
-            self.V = np.cov(self.Y, rowvar = False)
+            self.V = np.corrcoef(self.Y, rowvar = False)
         lik = LikelihoodMASH(self)
         lik.compute_relative_likelihood_matrix()
         lik.compute_loglik_from_matrix()
@@ -114,7 +114,7 @@ class MASH(RegressionData):
 
 class MNMASH:
     def __init__(self, X=None, Y=None, Z=None, B=None, S=None, V=None):
-        self.mash = MASH(X=X,Y=Y,Z=Z,B=B,S=S,V=np.cov(Y, rowvar=False) if V is None else V)
+        self.mash = MASH(X=X,Y=Y,Z=Z,B=B,S=S,V=np.corrcoef(Y, rowvar=False) if V is None else V)
         self.Y = Y
         # variational parameter for the one-nonzero effect model for each l and j
         self.alpha0 = None
