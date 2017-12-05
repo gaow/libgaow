@@ -31,7 +31,7 @@ class RegressionData(dotdict):
     def fit(self):
         pass
 
-    def get_summary_stats():
+    def get_summary_stats(self):
         if self.Z is not None:
             self.remove_covariates()
         # Compute betahat
