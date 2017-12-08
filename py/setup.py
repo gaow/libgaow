@@ -15,7 +15,7 @@ config = {
     'packages': ['libgaow'],
     'package_dir': {'libgaow':'src'},
     'name': 'libgaow',
-    'install_requires': ['scipy', 'scikit-learn', 'pandas']
+    'install_requires': ['scipy', 'scikit-learn', 'pandas', 'pathos']
 }
 
 setup(**config)

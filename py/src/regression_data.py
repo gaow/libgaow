@@ -12,8 +12,13 @@ import copy
 class dotdict(dict):
     """dot.notation access to dictionary attributes"""
     __setattr__ = dict.__setitem__
-    __getattr__ = dict.__getitem__
     __delattr__ = dict.__delitem__
+
+    def __getattr__(self, item):
+        try:
+            return self[item]
+        except KeyError:
+            raise AttributeError(item)
 
     def __deepcopy__(self, memo):
         return dotdict(copy.deepcopy(dict(self)))
