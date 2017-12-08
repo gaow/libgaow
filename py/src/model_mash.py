@@ -39,11 +39,9 @@ class LikelihoodMASH:
         self.R = data.B.shape[1]
         self.P = len(data.U)
         self.data = data
-        self.debug = None
 
     def compute_log10bf(self):
         self.data.l10bf = (self.data.lik['alt_loglik'] -  self.data.lik['null_loglik']) / np.log(10)
-        self.data.l10bf[np.isinf(self.data.l10bf)] = np.finfo(float).max
 
     def compute_relative_likelihood_matrix(self):
         matrix_llik = self._calc_likelihood_matrix_comcov() if self.data.is_common_cov() \
@@ -69,7 +67,8 @@ class LikelihoodMASH:
         '''
         if 'marginal' in options:
             # add a very small number for numeric issue eg prevent log(zero)
-            delta = 1 / np.finfo(float).max
+            # delta = 1 / np.finfo(float).max
+            delta = 0
             self.data.lik['marginal_loglik'] = np.log(self.data.lik['relative_likelihood'] @ self.data.pi + delta) + self.data.lik['lfactor']
             self.data.lik['loglik'] = np.sum(self.data.lik['marginal_loglik'])
         if 'alt' in options:
@@ -148,7 +147,7 @@ class PosteriorMASH:
 
     @staticmethod
     def get_posterior_cov(V_inv, U):
-        return U @ inv_sympd(V_inv @ U + np.identity(U.shape[0]))
+        return U @ np.linalg.inv(V_inv @ U + np.identity(U.shape[0]))
 
     @classmethod
     def apply(cls, data):

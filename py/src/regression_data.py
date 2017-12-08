@@ -21,6 +21,7 @@ class dotdict(dict):
 class RegressionData(dotdict):
     def __init__(self, X = None, Y = None, Z = None, B = None, S = None):
         # FIXME: check if inputs are indeed numpy arrays
+        self.debug = dotdict()
         self.x_centered = self.y_centered = self.z_centered = False
         self.reset({'X': X, 'Y': Y, 'Z': Z, 'B': B, 'S': S, 'lik' : None})
         if X is not None:
