@@ -29,9 +29,9 @@ def safe_mvnorm_logpdf(val, cov):
         return mvnorm.logpdf(val, cov=cov)
     except np.linalg.linalg.LinAlgError:
         if len(val.shape) == 1:
-            return np.finfo(float).max if np.sum(val) < 1E-6 else np.finfo(float).min
+            return np.inf if np.sum(val) < 1E-6 else -np.inf
         else:
-            return np.array([np.finfo(float).max if np.sum(x) < 1E-6 else np.finfo(float).min for x in val.T])
+            return np.array([np.inf if np.sum(x) < 1E-6 else -np.inf for x in val.T])
 
 class LikelihoodMASH:
     def __init__(self, data):
@@ -43,6 +43,7 @@ class LikelihoodMASH:
 
     def compute_log10bf(self):
         self.data.l10bf = (self.data.lik['alt_loglik'] -  self.data.lik['null_loglik']) / np.log(10)
+        self.data.l10bf[np.isinf(self.data.l10bf)] = np.finfo(float).max
 
     def compute_relative_likelihood_matrix(self):
         matrix_llik = self._calc_likelihood_matrix_comcov() if self.data.is_common_cov() \
@@ -67,12 +68,14 @@ class LikelihoodMASH:
         data.lik.relative_likelihood first column is null, the rest are alt
         '''
         if 'marginal' in options:
-            self.data.lik['marginal_loglik'] = np.log(self.data.lik['relative_likelihood'] @ self.data.pi) + self.data.lik['lfactor']
+            # add a very small number for numeric issue eg prevent log(zero)
+            delta = 1 / np.finfo(float).max
+            self.data.lik['marginal_loglik'] = np.log(self.data.lik['relative_likelihood'] @ self.data.pi + delta) + self.data.lik['lfactor']
             self.data.lik['loglik'] = np.sum(self.data.lik['marginal_loglik'])
         if 'alt' in options:
-            self.data.lik['alt_loglik'] = np.log(self.data.lik['relative_likelihood'][:,1:] @ (self.data.pi[1:] / (1 - self.data.pi[0]))) + self.data.lik['lfactor']
+            self.data.lik['alt_loglik'] = np.log(self.data.lik['relative_likelihood'][:,1:] @ (self.data.pi[1:] / (1 - self.data.pi[0])) + delta) + self.data.lik['lfactor']
         if 'null' in options:
-            self.data.lik['null_loglik'] = np.log(self.data.lik['relative_likelihood'][:,0]) + self.data.lik['lfactor']
+            self.data.lik['null_loglik'] = np.log(self.data.lik['relative_likelihood'][:,0] + delta) + self.data.lik['lfactor']
 
 class PosteriorMASH:
     def __init__(self, data):
