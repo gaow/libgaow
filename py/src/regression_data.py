@@ -35,9 +35,8 @@ class RegressionData(dotdict):
         if self.Z is not None:
             self.remove_covariates()
         # Compute betahat
-        XtY = self.X.T @ self.Y
         XtX_vec = np.einsum('ji,ji->i', self.X, self.X)
-        self.B = XtY / XtX_vec[:,np.newaxis]
+        self.B = (self.X.T @ self.Y) / XtX_vec[:,np.newaxis]
         # Compute se(betahat)
         Xr = self.Y - np.einsum('ij,jk->jik', self.X, self.B)
         Re = np.einsum('ijk,ijk->ik', Xr, Xr)
@@ -127,12 +126,12 @@ class MNMASH:
     def set_prior(self, U, grid = None, pi = None):
         self.mash.set_prior(U, grid, pi)
 
-    def fit(self, niter=100, L=5, calc_elbo=False):
+    def fit(self, niter=50, L=5, bool_elbo=False):
         self.alpha0 = np.zeros((L, self.mash.X.shape[1]))
         self.mu0 = np.zeros((L, self.mash.X.shape[1], self.Y.shape[1]))
         for i in range(niter):
             self._calc_update()
-            if calc_elbo:
+            if bool_elbo:
                 self._calc_elbo()
         self._calc_posterior()
 
