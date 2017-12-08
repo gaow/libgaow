@@ -29,9 +29,9 @@ def safe_mvnorm_logpdf(val, cov):
         return mvnorm.logpdf(val, cov=cov)
     except np.linalg.linalg.LinAlgError:
         if len(val.shape) == 1:
-            return np.inf if np.sum(val) < 1E-6 else -np.inf
+            return np.finfo(float).max if np.sum(val) < 1E-6 else np.finfo(float).min
         else:
-            return np.array([np.inf if np.sum(x) < 1E-6 else -np.inf for x in val.T])
+            return np.array([np.finfo(float).max if np.sum(x) < 1E-6 else np.finfo(float).min for x in val.T])
 
 class LikelihoodMASH:
     def __init__(self, data):
@@ -39,12 +39,6 @@ class LikelihoodMASH:
         self.R = data.B.shape[1]
         self.P = len(data.U)
         self.data = data
-        self.data.lik = {'relative_likelihood' : None,
-                         'lfactor': None,
-                         'marginal_loglik': None,
-                         'loglik': None,
-                         'null_loglik': None,
-                         'alt_loglik': None}
         self.debug = None
 
     def compute_log10bf(self):

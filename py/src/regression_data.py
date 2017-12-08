@@ -84,6 +84,12 @@ class MASH(RegressionData):
         self.posterior_weights = None
         self.grid = None
         self.l10bf = None
+        self.lik = {'relative_likelihood' : None,
+                         'lfactor': None,
+                         'marginal_loglik': None,
+                         'loglik': None,
+                         'null_loglik': None,
+                         'alt_loglik': None}
 
     def fit(self):
         if self.pi is None:
@@ -122,6 +128,7 @@ class MNMASH:
         self.Xr0 = np.zeros((self.Y.shape[0], self.Y.shape[1]))
         self.elbo = []
         self.post_mean_mat = None
+        self.iter_id = 0
 
     def set_prior(self, U, grid = None, pi = None):
         self.mash.set_prior(U, grid, pi)
@@ -133,6 +140,7 @@ class MNMASH:
             self._calc_update()
             if bool_elbo:
                 self._calc_elbo()
+            self.iter_id += 1
         self._calc_posterior()
 
     def _calc_update(self):
@@ -145,8 +153,8 @@ class MNMASH:
         self.mash.reset({'Y': R})
         self.mash.get_summary_stats()
         self.mash.fit()
-        bf = np.exp(self.mash.l10bf)
-        return bf/np.sum(bf), self.mash.post_mean_mat.T
+        bf_rel = np.exp((self.mash.l10bf - np.max(self.mash.l10bf)) * np.log(10))
+        return bf_rel / np.sum(bf_rel), self.mash.post_mean_mat.T
 
     def _calc_elbo(self):
         pass
