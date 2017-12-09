@@ -8,11 +8,17 @@ __version__ = "0.1.0"
 import numpy as np, scipy as sp
 from scipy.stats import norm, multivariate_normal as mvnorm
 from pathos.multiprocessing import ProcessingPool as Pool, cpu_count
+import ctypes
+from multiprocessing import Array as mp_array
 
-def chunks(l, n):
-    """Yield successive n-sized chunks from l."""
-    for i in range(0, len(l), n):
-        yield l[i:i + n]
+def shared_array(shape):
+    """
+    Form a shared memory numpy array.
+    """
+    shared_array_base = mp_array(ctypes.c_double, shape[0]*shape[1])
+    shared_array = np.ctypeslib.as_array(shared_array_base.get_obj())
+    shared_array = shared_array.reshape(*shape)
+    return shared_array
 
 def inv_sympd(m):
     '''
@@ -58,14 +64,14 @@ class LikelihoodMASH:
         self.data.lik['lfactor'] = lfactors
 
     def _calc_likelihood_matrix(self):
-        loglik = np.zeros((self.J, self.P))
+        loglik = shared_array((self.J, self.P))
         def calc_single_task(js):
             for j in js:
                 sigma_mat = get_svs(self.data.S[j,:], self.data.V)
                 loglik[j,:] = np.array([safe_mvnorm_logpdf(self.data.B[j,:], sigma_mat + self.data.U[p]) for p in self.data.U])
         #
         pool = Pool(processes=self.n_jobs)
-        pool.map(calc_single_task, (js for js in chunks(range(self.J), self.n_jobs)))
+        pool.map(calc_single_task, (js for js in np.array_split(range(self.J), self.n_jobs)))
         return loglik
 
     def _calc_likelihood_matrix_comcov(self):
@@ -99,10 +105,10 @@ class PosteriorMASH:
         self.R = data.B.shape[1]
         self.P = len(data.U)
         self.data = data
-        self.data.post_mean_mat = np.zeros((self.R, self.J))
-        self.data.post_mean2_mat = np.zeros((self.R, self.J))
-        self.data.neg_prob_mat = np.zeros((self.R, self.J))
-        self.data.zero_prob_mat = np.zeros((self.R, self.J))
+        self.data.post_mean_mat = shared_array((self.R, self.J))
+        self.data.post_mean2_mat = shared_array((self.R, self.J))
+        self.data.neg_prob_mat = shared_array((self.R, self.J))
+        self.data.zero_prob_mat = shared_array((self.R, self.J))
         self.n_jobs = max(cpu_count() - 1, 2)
 
     def compute_posterior_weights(self):
@@ -132,7 +138,7 @@ class PosteriorMASH:
                 self.data.zero_prob_mat[:,j] = zero_mat @ self.data.posterior_weights[:,j]
         #
         pool = Pool(processes=self.n_jobs)
-        pool.map(calc_single_task, (js for js in chunks(range(self.J), self.n_jobs)))
+        pool.map(calc_single_task, (js for js in np.array_split(range(self.J), self.n_jobs)))
 
     def compute_posterior_comcov(self):
         Vinv_mat = inv_sympd(get_svs(self.data.S[0,:], self.data.V))
