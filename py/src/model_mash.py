@@ -7,18 +7,6 @@ __version__ = "0.1.0"
 
 import numpy as np, scipy as sp
 from scipy.stats import norm, multivariate_normal as mvnorm
-from pathos.multiprocessing import ProcessingPool as Pool, cpu_count
-import ctypes
-from multiprocessing import Array as mp_array
-
-def shared_array(shape):
-    """
-    Form a shared memory numpy array.
-    """
-    shared_array_base = mp_array(ctypes.c_double, shape[0]*shape[1])
-    shared_array = np.ctypeslib.as_array(shared_array_base.get_obj())
-    shared_array = shared_array.reshape(*shape)
-    return shared_array
 
 def inv_sympd(m):
     '''
@@ -51,7 +39,6 @@ class LikelihoodMASH:
         self.R = data.B.shape[1]
         self.P = len(data.U)
         self.data = data
-        self.n_jobs = max(cpu_count() - 1, 2)
 
     def compute_log10bf(self):
         self.data.l10bf = (self.data.lik['alt_loglik'] -  self.data.lik['null_loglik']) / np.log(10)
@@ -64,14 +51,10 @@ class LikelihoodMASH:
         self.data.lik['lfactor'] = lfactors
 
     def _calc_likelihood_matrix(self):
-        loglik = shared_array((self.J, self.P))
-        def calc_single_task(js):
-            for j in js:
-                sigma_mat = get_svs(self.data.S[j,:], self.data.V)
-                loglik[j,:] = np.array([safe_mvnorm_logpdf(self.data.B[j,:], sigma_mat + self.data.U[p]) for p in self.data.U])
-        #
-        pool = Pool(processes=self.n_jobs)
-        pool.map(calc_single_task, (js for js in np.array_split(range(self.J), self.n_jobs)))
+        loglik = np.zeros((self.J, self.P))
+        for j in range(self.J):
+            sigma_mat = get_svs(self.data.S[j,:], self.data.V)
+            loglik[j,:] = np.array([safe_mvnorm_logpdf(self.data.B[j,:], sigma_mat + self.data.U[p]) for p in self.data.U])
         return loglik
 
     def _calc_likelihood_matrix_comcov(self):
@@ -105,40 +88,35 @@ class PosteriorMASH:
         self.R = data.B.shape[1]
         self.P = len(data.U)
         self.data = data
-        self.data.post_mean_mat = shared_array((self.R, self.J))
-        self.data.post_mean2_mat = shared_array((self.R, self.J))
-        self.data.neg_prob_mat = shared_array((self.R, self.J))
-        self.data.zero_prob_mat = shared_array((self.R, self.J))
-        self.n_jobs = max(cpu_count() - 1, 2)
+        self.data.post_mean_mat = np.zeros((self.R, self.J))
+        self.data.post_mean2_mat = np.zeros((self.R, self.J))
+        self.data.neg_prob_mat = np.zeros((self.R, self.J))
+        self.data.zero_prob_mat = np.zeros((self.R, self.J))
 
     def compute_posterior_weights(self):
         d = (self.data.pi * self.data.lik['relative_likelihood'])
         self.data.posterior_weights = (d.T / np.sum(d, axis = 1))
 
     def compute_posterior(self):
-        def calc_single_task(js):
-            for j in js:
-                Vinv_mat = inv_sympd(get_svs(self.data.S[j,:], self.data.V))
-                mu1_mat = np.zeros((self.R, self.P))
-                mu2_mat = np.zeros((self.R, self.P))
-                zero_mat = np.zeros((self.R, self.P))
-                neg_mat = np.zeros((self.R, self.P))
-                for p, name in enumerate(self.data.U.keys()):
-                    U1_mat = self.get_posterior_cov(Vinv_mat, self.data.U[name])
-                    mu1_mat[:,p] = self.get_posterior_mean_vec(self.data.B[j,:], Vinv_mat, U1_mat)
-                    sigma_vec = np.sqrt(np.diag(U1_mat))
-                    null_cond = (sigma_vec == 0)
-                    mu2_mat[:,p] = np.square(mu1_mat[:,p]) + np.diag(U1_mat)
-                    if not null_cond.all():
-                        neg_mat[np.invert(null_cond),p] = norm.sf(mu1_mat[np.invert(null_cond),p], scale=sigma_vec[np.invert(null_cond)])
-                    zero_mat[null_cond,p] = 1.0
-                self.data.post_mean_mat[:,j] = mu1_mat @ self.data.posterior_weights[:,j]
-                self.data.post_mean2_mat[:,j] = mu2_mat @ self.data.posterior_weights[:,j]
-                self.data.neg_prob_mat[:,j] = neg_mat @ self.data.posterior_weights[:,j]
-                self.data.zero_prob_mat[:,j] = zero_mat @ self.data.posterior_weights[:,j]
-        #
-        pool = Pool(processes=self.n_jobs)
-        pool.map(calc_single_task, (js for js in np.array_split(range(self.J), self.n_jobs)))
+        for j in range(self.J):
+            Vinv_mat = inv_sympd(get_svs(self.data.S[j,:], self.data.V))
+            mu1_mat = np.zeros((self.R, self.P))
+            mu2_mat = np.zeros((self.R, self.P))
+            zero_mat = np.zeros((self.R, self.P))
+            neg_mat = np.zeros((self.R, self.P))
+            for p, name in enumerate(self.data.U.keys()):
+                U1_mat = self.get_posterior_cov(Vinv_mat, self.data.U[name])
+                mu1_mat[:,p] = self.get_posterior_mean_vec(self.data.B[j,:], Vinv_mat, U1_mat)
+                sigma_vec = np.sqrt(np.diag(U1_mat))
+                null_cond = (sigma_vec == 0)
+                mu2_mat[:,p] = np.square(mu1_mat[:,p]) + np.diag(U1_mat)
+                if not null_cond.all():
+                    neg_mat[np.invert(null_cond),p] = norm.sf(mu1_mat[np.invert(null_cond),p], scale=sigma_vec[np.invert(null_cond)])
+                zero_mat[null_cond,p] = 1.0
+            self.data.post_mean_mat[:,j] = mu1_mat @ self.data.posterior_weights[:,j]
+            self.data.post_mean2_mat[:,j] = mu2_mat @ self.data.posterior_weights[:,j]
+            self.data.neg_prob_mat[:,j] = neg_mat @ self.data.posterior_weights[:,j]
+            self.data.zero_prob_mat[:,j] = zero_mat @ self.data.posterior_weights[:,j]
 
     def compute_posterior_comcov(self):
         Vinv_mat = inv_sympd(get_svs(self.data.S[0,:], self.data.V))
