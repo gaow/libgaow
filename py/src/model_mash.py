@@ -161,7 +161,7 @@ class PosteriorMASH:
 class PriorMASH:
     def __init__(self, data):
         self.data = data
-        self.R = data.B.shape[1]
+        self.R = data.U[list(data.U.keys())[0]].shape[1]
 
     def expand_cov(self, use_pointmass = True):
         def product(x,y):

@@ -7,7 +7,10 @@ __version__ = "0.1.0"
 
 from .model_mash import PriorMASH, LikelihoodMASH, PosteriorMASH
 import numpy as np
-import copy
+import os, copy
+import seaborn as sns
+import matplotlib.pyplot as plt
+import pandas as pd
 
 class dotdict(dict):
     """dot.notation access to dictionary attributes"""
@@ -33,6 +36,8 @@ class RegressionData(dotdict):
             self.trace_XXt = np.sum(np.square(X), axis = 1)
         if (self.X is not None and self.Y is not None) and (self.B is None and self.S is None):
             self.get_summary_stats()
+        self.xcorr = None
+        self.sigma = None
 
     def fit(self):
         pass
@@ -49,8 +54,9 @@ class RegressionData(dotdict):
         self.S = np.sqrt(Re / XtX_vec[:,np.newaxis] / (self.X.shape[0] - 2))
 
     def remove_covariates(self):
-        self.Y -= self.Z @ (np.linalg.inv(self.Z.T @ self.Z) @ self.Z.T @ self.Y)
-        self.Z = None
+        if self.Z is not None:
+            self.Y -= self.Z @ (np.linalg.inv(self.Z.T @ self.Z) @ self.Z.T @ self.Y)
+            self.Z = None
 
     def reset(self, init_data):
         self.update(init_data)
@@ -69,6 +75,44 @@ class RegressionData(dotdict):
         if self.Z is not None and not self.z_centered:
             self.Z -= np.mean(self.Z, axis=0, keepdims=True)
             self.z_centered = True
+
+    def get_xcorr(self, save_to = None):
+        '''
+        compute column correlations of X.
+        i.e., LD if X is genotype matrix based on r^2
+        - the result is signed r^2 values of Pearson correlations
+        '''
+        self.xcorr = np.corrcoef(self.X, rowvar = False)
+        self.xcorr = (np.square(self.xcorr) * np.sign(self.xcorr)).astype(np.float16)
+        if save_to is not None:
+            if os.path.isfile(save_to):
+                os.remove(save_to)
+            np.save(save_to, self.xcorr)
+
+    def set_xcorr(self, xcorr):
+        self.xcorr = xcorr
+
+    def plot_xcorr(self, out):
+        use_abs = np.sum((self.xcorr < 0).values.ravel()) == 0
+        fig, ax = plt.subplots()
+        cmap = sns.cubehelix_palette(50, hue=0.05, rot=0, light=1, dark=0, as_cmap=True)
+        sns.heatmap(self.xcorr, ax = ax, cmap = cmap, vmin=-1 if not use_abs else 0,
+                    vmax=1, square=True, xticklabels = False, yticklabels = False)
+        ax = plt.gca()
+        plt.savefig(out, dpi = 500)
+
+    def permute_X(self):
+        '''
+        Permute X columns, ie break LD structure for genotype input X
+        '''
+        np.random.shuffle(self.X)
+
+    def plot_B(self, b_vec, out):
+        fig, ax = plt.subplots()
+        sns.lmplot('index', 'data', data = pd.DataFrame({'index': [x+1 for x in range(len(b_vec))],
+                                         'data': b_vec}))
+        ax = plt.gca()
+        plt.savefig(out, dpi = 500)
 
     def __str__(self):
         l = dir(self)
@@ -113,7 +157,7 @@ class MASH(RegressionData):
             self._is_common_cov = (self.S.T == self.S.T[0,:]).all()
         return self._is_common_cov
 
-    def set_prior(self, U, grid = None, pi = None):
+    def set_prior(self, U, grid = None, pi = None, use_pointmass = True):
         # FIXME: allow autogrid select?
         # FIXME: ensure U is ordered dict
         self.U = U
@@ -121,7 +165,7 @@ class MASH(RegressionData):
         self.pi = np.array(pi) if pi is not None else None
         prior = PriorMASH(self)
         if grid is not None:
-            prior.expand_cov()
+            prior.expand_cov(use_pointmass)
 
 class MNMASH:
     def __init__(self, X=None, Y=None, Z=None, B=None, S=None, V=None):
@@ -136,8 +180,8 @@ class MNMASH:
         self.post_mean_mat = None
         self.iter_id = 0
 
-    def set_prior(self, U, grid = None, pi = None):
-        self.mash.set_prior(U, grid, pi)
+    def set_prior(self, U, grid = None, pi = None, use_pointmass = True):
+        self.mash.set_prior(U, grid, pi, use_pointmass)
 
     def fit(self, niter=50, L=5, bool_elbo=False):
         self.alpha0 = np.zeros((L, self.mash.X.shape[1]))
@@ -179,14 +223,4 @@ class MNMASH:
 
 if __name__ == '__main__':
     model = MNMASH(X=X,Y=Y)
-    model.fit(niter = 50)
-    import seaborn as sns
-    import matplotlib.pyplot as plt
-    plt.scatter([x+1 for x in range(len(model.post_mean_mat[:,0]))], model.post_mean_mat[:,0],
-                cmap="viridis")
-    ax = plt.gca()
-    plt.show()
-    plt.scatter([x+1 for x in range(len(model.post_mean_mat[:,1]))], model.post_mean_mat[:,1],
-                cmap="viridis")
-    ax = plt.gca()
-    plt.show()
+    model.fit(niter = 10)
