@@ -163,13 +163,17 @@ class PriorMASH:
         self.data = data
         self.R = data.U[list(data.U.keys())[0]].shape[1]
 
-    def expand_cov(self, use_pointmass = True):
+    def expand_cov(self, pi0 = 0):
         def product(x,y):
             for item in y:
                 yield x*item
         # dict in Python 3.6 is ordered
         res = dict()
-        if use_pointmass:
-            res['null'] = np.zeros((self.R, self.R))
+        res['null'] = np.zeros((self.R, self.R))
         res.update(dict(sum([[(f"{p}.{i+1}", g) for i, g in enumerate(product(self.data.U[p], np.square(self.data.grid)))] for p in self.data.U], [])))
         self.data.U = res
+        if self.data.pi is None:
+            self.data.pi = np.array([1/len(self.data.U.keys()) for i in range(len(self.data.U.keys()))])
+            self.data.pi[0] = pi0
+        else:
+            self.data.pi = np.insert(self.data.pi, 0, pi0)

@@ -157,7 +157,7 @@ class MASH(RegressionData):
             self._is_common_cov = (self.S.T == self.S.T[0,:]).all()
         return self._is_common_cov
 
-    def set_prior(self, U, grid = None, pi = None, use_pointmass = True):
+    def set_prior(self, U, grid = None, pi = None, pi0 = 0):
         # FIXME: allow autogrid select?
         # FIXME: ensure U is ordered dict
         self.U = U
@@ -165,7 +165,7 @@ class MASH(RegressionData):
         self.pi = np.array(pi) if pi is not None else None
         prior = PriorMASH(self)
         if grid is not None:
-            prior.expand_cov(use_pointmass)
+            prior.expand_cov(pi0)
 
 class MNMASH:
     def __init__(self, X=None, Y=None, Z=None, B=None, S=None, V=None):
@@ -180,8 +180,8 @@ class MNMASH:
         self.post_mean_mat = None
         self.iter_id = 0
 
-    def set_prior(self, U, grid = None, pi = None, use_pointmass = True):
-        self.mash.set_prior(U, grid, pi, use_pointmass)
+    def set_prior(self, U, grid = None, pi = None, pi0 = 0):
+        self.mash.set_prior(U, grid, pi, pi0)
 
     def fit(self, niter=50, L=5, bool_elbo=False):
         self.alpha0 = np.zeros((L, self.mash.X.shape[1]))
