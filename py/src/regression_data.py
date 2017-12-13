@@ -11,6 +11,7 @@ import os, copy
 import seaborn as sns
 import matplotlib.pyplot as plt
 import pandas as pd
+from pprint import pformat
 
 class dotdict(dict):
     """dot.notation access to dictionary attributes"""
@@ -115,10 +116,7 @@ class RegressionData(dotdict):
         plt.savefig(out, dpi = 500)
 
     def __str__(self):
-        l = dir(self)
-        d = self.__dict__
-        from pprint import pformat
-        return pformat(d, indent = 4)
+        return pformat(self.__dict__, indent = 4)
 
 class MASH(RegressionData):
     def __init__(self, X = None, Y = None, Z = None, B = None, S = None, V = None):
@@ -166,6 +164,9 @@ class MASH(RegressionData):
         prior = PriorMASH(self)
         if grid is not None:
             prior.expand_cov(pi0)
+
+    def __str__(self):
+        return pformat(self.__dict__, indent = 4)
 
 class MNMASH:
     def __init__(self, X=None, Y=None, Z=None, B=None, S=None, V=None):
@@ -216,10 +217,7 @@ class MNMASH:
         self.post_mean_mat = np.sum(almu, axis = 0)
 
     def __str__(self):
-        l = dir(self)
-        d = self.__dict__
-        from pprint import pformat
-        return pformat(d, indent = 4)
+        return pformat(self.__dict__, indent = 4)
 
 if __name__ == '__main__':
     model = MNMASH(X=X,Y=Y)

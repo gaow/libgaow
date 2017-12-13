@@ -67,8 +67,8 @@ class LikelihoodMASH:
         '''
         if 'marginal' in options:
             # add a very small number for numeric issue eg prevent log(zero)
-            # delta = 1 / np.finfo(float).max
-            delta = 0
+            delta = 1 / np.finfo(float).max
+            # delta = 0
             self.data.lik['marginal_loglik'] = np.log(self.data.lik['relative_likelihood'] @ self.data.pi + delta) + self.data.lik['lfactor']
             self.data.lik['loglik'] = np.sum(self.data.lik['marginal_loglik'])
         if 'alt' in options:
