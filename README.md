@@ -1,2 +1,1 @@
-# libgaow
-Routine computational performed by @gaow
+Routine computational in regression
